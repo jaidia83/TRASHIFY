@@ -2,7 +2,7 @@
   "name": "Trashify",
   "short_name": "Trashify",
   "id": "/",
-  "start_url": "/TRASHIFYHomePage.html",
+  "start_url": "./TRASHIFYHomePage.html",
   "scope": "/",
   "display": "standalone",
   "background_color": "#FFE9D2",
