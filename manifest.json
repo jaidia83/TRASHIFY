@@ -1,0 +1,23 @@
+{
+  "name": "Trashify",
+  "short_name": "Trashify",
+  "id": "/",
+  "start_url": "/TRASHIFYHomePage.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFE9D2",
+  "theme_color": "#FFE9D2",
+  "orientation": "landscape-primary",
+  "icons": [
+    {
+      "src": "TRASHIFYicon-copy.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "TRASHIFYicon.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}

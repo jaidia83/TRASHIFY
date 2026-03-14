@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.10.0/p5.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://assets.uiowa.edu/css/gotham.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+  <title>Trash Classifier</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+
+<header>
+ <img src="logo.png" class="header-icon">
+<span>Trashif.ai</span>
+</header>
+<div class="content-wrapper">
+<label for="upload-img" class="custom-file-upload">
+  <img src="upload-image.png" class="header-icon">
+        Upload Image
+      </label> 
+      <input type="file" id="upload-img" accept="image/*" style="display:none;">
+  <div id="main-container">
+   <div id="canvas-holder">
+  <button id="flip-btn" class="icon-button">
+    <img src="flip-camera.png" alt="Flip Camera">
+  </button>
+</div>
+    <div id="label-box">Analyzing...</div>
+  </div>
+
+
+  <div id="extra-boxes-row">
+    <div id="box-compost" class="small-box">COMPOST</div>
+    <div id="box-fuel" class="small-box">RENEWABLE FUEL</div>
+    <div id="box-recyclable" class="small-box">RECYCLABLE</div>
+  </div>
+</div>
+
+
+
+  <div id="checklist-container">
+    <h3>Preparation Checklist</h3>
+    <ul id="prep-checklist">
+
+
+    <li>Waiting for detection...</li>
+    </ul>
+  </div>
+
+
+  <script>
+let video;
+let classifier;
+let label = "";
+let currentFacingMode = 'user';
+let classificationInterval;
+let uploadedImage = null;
+let isVideoMode = true;
+
+
+
+
+const categories = {
+  "compost": ["organic waste", "wood"],
+  "fuel": ["textile", "trash", "e-waste", "wood", "paper", "cardboard", "carton"],
+  "recyclable": ["plastic", "textile", "metal", "cardboard", "glass", "aluminum", "carton", "wood", "paper", "e-waste"]
+};
+
+
+const preparationTips = {
+  "plastic": [
+    "Rinse container",
+    "Check for recycling number"
+  ],
+  "glass": [
+    "Rinse thoroughly",
+    "Remove lids",
+    "Do not include broken glass"
+  ],
+  "paper": [
+    "Keep dry",
+    "Remove stains",
+    "Flatten if possible"
+  ],
+  "cardboard": [
+    "Flatten boxes",
+    "Keep dry"
+  ],
+  "metal": [
+    "Rinse clean",
+    "Remove residue"
+  ],
+  "organic waste": [
+    "Remove packaging",
+    "Place in compost bin"
+  ],
+  "e-waste": [
+    "Do NOT put in regular trash",
+    "Take to certified e-waste facility",
+    "Remove batteries if possible"
+  ],
+  "trash": [
+    "Cannot be recycled",
+    "Dispose in landfill bin"
+  ]
+};
+
+
+function preload() {
+  classifier = ml5.imageClassifier("https://teachablemachine.withgoogle.com/models/0QU9QYDPS/");
+}
+
+
+function setup() {
+  let cnv = createCanvas(500, 320);
+  cnv.parent("canvas-holder");
+  startCamera();
+
+
+  // Event Listeners
+  document.getElementById('flip-btn').addEventListener('click', () => {
+    isVideoMode = true;
+    uploadedImage = null;
+    currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    startCamera();
+  });
+
+
+  document.getElementById("upload-img").addEventListener("change", handleUpload);
+}
+
+
+function startCamera() {
+  if (video) {
+    video.stop();
+    video.remove();
+    clearTimeout(classificationInterval); // Stop old loop
+  }
+
+
+  const constraints = {
+    video: {
+      facingMode: currentFacingMode
+    },
+    audio: false
+  };
+
+  video = createCapture(constraints, function(stream) {
+    console.log("Camera swapped to: " + currentFacingMode);
+  });
+ 
+  video.size(500, 320);
+  video.hide();
+
+
+  const canvasElement = document.querySelector('#canvas-holder canvas');
+  if (currentFacingMode === 'user') {
+    canvasElement.style.transform = "scaleX(-1)";
+  } else {
+    canvasElement.style.transform = "scaleX(1)";
+  }
+
+  classifyVideo();
+}
+
+function classifyVideo() {
+  classifier.classify(video, (results) => {
+    gotResults(results)
+    classificationInterval = setTimeout(classifyVideo, 1000);
+  });
+}
+
+
+function draw() {
+  background(220);
+  if (uploadedImage) {
+    image(uploadedImage, 0, 0, width, height);
+  } else if (video) {
+    image(video, 0, 0, width, height);
+  }
+}
+
+
+function handleUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+
+  isVideoMode = false;
+  if (video) {
+    video.stop();
+    clearTimeout(classificationInterval);
+  }
+
+
+  const canvasElement = document.querySelector('#canvas-holder canvas');
+  canvasElement.style.transform = "scaleX(1)";
+  const imgURL = URL.createObjectURL(file);
+  uploadedImage = loadImage(imgURL, () => {
+    classifier.classify(uploadedImage, (results) => {
+      gotResults(results);
+    });
+  });
+}
+
+
+function gotResults(results) {
+  if (results && results.length > 0) {
+    label = results[0].label.toLowerCase();
+    document.getElementById("label-box").innerText = getCustomLabel(label);
+    updateUI(label);
+    updateChecklist(label);
+  }
+}
+
+
+function updateUI(detectedLabel) {
+  const boxes = document.querySelectorAll('.small-box');
+  boxes.forEach(box => box.classList.remove('active'));
+
+
+  if (categories.compost.includes(detectedLabel)) {
+    document.getElementById("box-compost").classList.add('active');
+  }
+  if (categories.fuel.includes(detectedLabel)) {
+    document.getElementById("box-fuel").classList.add('active');
+  }
+  if (categories.recyclable.includes(detectedLabel)) {
+    document.getElementById("box-recyclable").classList.add('active');
+  }
+}
+
+
+function getCustomLabel(label) {
+  const labels = {
+    "plastic": "Plastic Detected",
+    "metal": "Metal Detected",
+    "paper": "Paper Detected",
+    "cardboard": "Cardboard Detected",
+    "glass": "Glass Detected",
+    "trash": "Trash Detected",
+    "aluminum": "Aluminum Detected",
+    "carton": "Carton Detected",
+    "organic waste": "Organic waste Detected",
+    "wood": "Wood Detected",
+    "textile": "Textile Detected",
+    "e-waste": "E-waste Detected"
+  };
+  return labels[label] || "Scanning...";
+}
+
+
+function updateChecklist(detectedLabel) {
+  const checklist = document.getElementById("prep-checklist");
+  checklist.innerHTML = "";
+
+
+  const tips = preparationTips[detectedLabel];
+
+
+  if (tips) {
+    tips.forEach(tip => {
+      const li = document.createElement("li");
+      li.innerText = tip;
+      checklist.appendChild(li);
+    });
+  } else {
+    const li = document.createElement("li");
+    li.innerText = "No preparation needed.";
+    checklist.appendChild(li);
+  }
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js")
+    .then(() => console.log("Service Worker Registered"));
+}
+
+</script>
+</body>
+</html>
